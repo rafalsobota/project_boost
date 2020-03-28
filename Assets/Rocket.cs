@@ -2,14 +2,26 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class Rocket : MonoBehaviour
 {
 
     [SerializeField] float rcsThrust = 100f;
     [SerializeField] float mainThrust = 1f;
+
+    [SerializeField] AudioClip mainEngine;
+    [SerializeField] AudioClip success;
+    [SerializeField] AudioClip death;
+
+    [SerializeField] ParticleSystem mainEngineParticles;
+    [SerializeField] ParticleSystem successParticles;
+    [SerializeField] ParticleSystem deathParticles;
+
     Rigidbody rigidBody;
     AudioSource audioSource;
+    enum State { Alive, Transcending, Dead }
+    State state = State.Alive;
 
     // Start is called before the first frame update
     void Start()
@@ -22,8 +34,11 @@ public class Rocket : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Thrust();
-        Rotate();
+        if (state == State.Alive)
+        {
+            Thrust();
+            Rotate();
+        }
     }
 
     private void Rotate()
@@ -52,23 +67,53 @@ public class Rocket : MonoBehaviour
             if (!audioSource.isPlaying)
             {
                 audioSource.Play();
+                mainEngineParticles.Play();
             }
         }
         else
         {
             audioSource.Stop();
+            mainEngineParticles.Stop();
         }
     }
 
     private void OnCollisionEnter(Collision collision)
     {
+        if (state != State.Alive)
+        {
+            return;
+        }
+
         switch (collision.gameObject.tag)
         {
             case "Friendly":
                 break;
+            case "Finish":
+                state = State.Transcending;
+                audioSource.Stop();
+                audioSource.PlayOneShot(success);
+                successParticles.Play();
+                Invoke("LoadNextScene", 2f);
+                break;
             default:
-                print("Dead");
+                state = State.Dead;
+                audioSource.Stop();
+                audioSource.PlayOneShot(death);
+                mainEngineParticles.Stop();
+                deathParticles.Play();
+                Invoke("LoadFirstLevel", 2f);
                 break;
         }
+    }
+
+    private void LoadFirstLevel()
+    {
+        SceneManager.LoadScene(0);
+    }
+
+    private void LoadNextScene()
+    {
+        int currentSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        SceneManager.LoadScene((currentSceneIndex + 1) % SceneManager.sceneCountInBuildSettings );
     }
 }
